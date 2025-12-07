@@ -9,8 +9,7 @@ import time
 # 👇 1. TOKEN SETUP
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-# 👇 2. APNA RENDER URL YAHAN DALEIN (Zaroori hai!)
-# Example: "https://your-app.onrender.com"
+# 👇 2. APNA RENDER URL YAHAN DALEIN
 WEB_APP_URL = "https://cashylive.onrender.com"  # <--- YAHAN CHANGE KAREIN
 
 bot = telebot.TeleBot(API_TOKEN)
@@ -50,7 +49,7 @@ def keep_alive():
     t = Thread(target=run_web)
     t.start()
 
-# --- HELPER FUNCTIONS (NOTIFICATION LOGIC YAHAN HAI) ---
+# --- HELPER FUNCTIONS ---
 def ensure_user(user_id, referrer_id=None):
     uid = str(user_id)
     if uid not in users:
@@ -64,13 +63,13 @@ def ensure_user(user_id, referrer_id=None):
             'join_date': time.time()
         }
         
-        # Referrer ko Commission aur Notification Dena
+        # Referrer Logic
         if referrer_id and str(referrer_id) in users:
             users[str(referrer_id)]['refers'] += 1
             users[str(referrer_id)]['balance'] += 40.0
             save_data(users)
             
-            # 👇 YE RAHA AAPKA SCREENSHOT WALA MESSAGE 👇
+            # Notification to Referrer
             try:
                 msg = (
                     f"🎉 **Someone joined via your referral!**\n\n"
@@ -79,8 +78,7 @@ def ensure_user(user_id, referrer_id=None):
                     f"💳 Check balance for details!"
                 )
                 bot.send_message(referrer_id, msg, parse_mode="Markdown")
-            except:
-                pass # Agar user ne bot block kiya ho to error ignore karein
+            except: pass
 
         save_data(users)
     return users[uid]
@@ -97,12 +95,22 @@ def get_main_menu():
     markup.row(types.KeyboardButton("Refer and Earn 👥"), types.KeyboardButton("Extra ➡️"))
     return markup
 
+# --- NEW SECRET COMMAND (TESTING KE LIYE) ---
+@bot.message_handler(commands=['reset'])
+def reset_user(message):
+    uid = str(message.from_user.id)
+    if uid in users:
+        del users[uid]
+        save_data(users)
+        bot.reply_to(message, "🗑 **Data Deleted!**\nAb aap wapis Referral Link se join karke test kar sakte hain.")
+    else:
+        bot.reply_to(message, "❌ Aapka data pehle se deleted hai.")
+
 # --- COMMANDS ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     uid = message.from_user.id
     args = message.text.split()
-    # Referral ID check
     referrer = args[1] if len(args) > 1 and args[1].isdigit() and args[1] != str(uid) else None
     
     ensure_user(uid, referrer)
@@ -115,7 +123,7 @@ def send_welcome(message):
     )
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=get_main_menu())
 
-# --- AD REWARD & COMMISSION ---
+# --- AD REWARD ---
 @bot.message_handler(content_types=['web_app_data'])
 def web_app_data_handler(message):
     if message.web_app_data.data == "AD_WATCHED_SUCCESS":
@@ -125,7 +133,7 @@ def web_app_data_handler(message):
         reward = 4.2
         users[uid]['balance'] += reward
         
-        # 5% Commission Logic
+        # Commission
         ref_id = users[uid].get('referrer')
         if ref_id and str(ref_id) in users:
             commission = reward * 0.05
