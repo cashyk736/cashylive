@@ -8,7 +8,7 @@ import time
 
 # 👇 RENDER ENVIRONMENT VARIABLE SE TOKEN LEGA 👇
 # (Make sure Render me 'API_TOKEN' naam se variable set ho)
-API_TOKEN = os.environ.get('API_TOKEN')
+API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 # 👇 APNA REPLIT/RENDER WEB URL (Agar WebApp button use kar rahe hain) 👇
 # Agar Render ka URL hai to wo yahan dalein
