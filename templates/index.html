@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ad Reward</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <script src='//libtl.com/sdk.js' data-zone='10286832' data-sdk='show_10286832'></script>
+
+    <style>
+        body { background-color: #2c3e50; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #2ecc71; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .btn {
+            background: linear-gradient(92.88deg, #455EB5 9.16%, #5643CC 43.89%, #673FD7 64.72%);
+            color: white; padding: 15px 30px; border: none; border-radius: 8px; 
+            font-size: 18px; font-weight: bold; margin-top: 30px; 
+            cursor: pointer; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+    <div id="status-box">
+        <h3>⏳ Loading Ad...</h3>
+        <div class="loader"></div>
+        <p>Please watch the full ad to earn.</p>
+    </div>
+
+    <button class="btn" id="claimBtn" onclick="sendReward()">✅ CLAIM ₹4.2 REWARD</button>
+
+    <script>
+        // Telegram App ko ready karna
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand(); // Full screen
+
+        document.addEventListener("DOMContentLoaded", function() {
+            setTimeout(function() {
+                try {
+                    // Ad dikhao
+                    show_10286832().then(() => {
+                        // Ad Success
+                        document.querySelector("h3").innerText = "🎉 Ad Watched!";
+                        document.querySelector(".loader").style.display = "none";
+                        document.querySelector("p").innerText = "Success! Click button below.";
+
+                        // Button dikhao
+                        document.getElementById("claimBtn").style.display = "inline-block";
+                    })
+                } catch (e) {
+                    console.error(e);
+                    // Agar ad fail ho jaye, tab bhi testing ke liye button dikha do
+                    document.querySelector("h3").innerText = "⚠️ Ad Error (Test Mode)";
+                    document.querySelector(".loader").style.display = "none";
+                    document.getElementById("claimBtn").style.display = "inline-block";
+                }
+            }, 1000);
+        });
+
+        function sendReward() {
+            // Ye data Bot ko wapas bhejega
+            // Yahi wo "Data from..." wala message trigger karega
+            window.Telegram.WebApp.sendData("AD_WATCHED_SUCCESS");
+        }
+    </script>
+</body>
+</html>
