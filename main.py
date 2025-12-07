@@ -1,65 +1,20 @@
 import telebot
 from telebot import types
-from flask import Flask, request
+from flask import Flask, render_template, request
 from threading import Thread
 import json
 import os
 import time
 
-# 👇 1. TOKEN SETUP (Render Environment se lega)
+# 👇 1. TOKEN SETUP (Render Environment Variable se lega)
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-# 👇 2. APNA RENDER URL YAHAN PASTE KAREIN (ZAROORI HAI!) 👇
+# 👇 2. APNA RENDER URL YAHAN DALEIN (Iske bina Ads nahi chalenge)
 # Example: "https://cashylive.onrender.com"
-WEB_APP_URL = "https://cashylive.onrender.com"  # <--- YAHAN CHANGE KAREIN
+WEB_APP_URL = "https://cashylive.onrender.com"  # <--- Change this to your actual link
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
-
-# --- AD PAGE HTML (Isse 'Not Found' error nahi aayega) ---
-AD_PAGE_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Watch Ad</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; display: flex; flex-direction: column; justify-content: center; height: 100vh; margin: 0; }
-.btn { background-color: #2ea650; color: white; padding: 15px 30px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; display: none; margin-top: 20px; }
-.loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto; }
-h2 { color: #333; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-</style>
-</head>
-<body>
-    <div id="loading">
-        <div class="loader"></div>
-        <h2>⏳ Loading Ad...</h2>
-        <p>Please wait 3 seconds</p>
-    </div>
-    
-    <div id="content" style="display:none;">
-        <h1>🎉 Ad Watched!</h1>
-        <p>Click below to claim reward.</p>
-        <button id="claimBtn" class="btn" onclick="claimReward()">✅ Claim ₹4.2</button>
-    </div>
-
-<script>
-    // 3 Second ka fake timer
-    setTimeout(() => {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('content').style.display = 'block';
-        document.getElementById('claimBtn').style.display = 'inline-block';
-    }, 3000);
-
-    function claimReward() {
-        Telegram.WebApp.sendData("AD_WATCHED_SUCCESS");
-    }
-</script>
-</body>
-</html>
-"""
 
 # --- DATABASE SYSTEM ---
 DB_FILE = "database.json"
@@ -78,10 +33,11 @@ def save_data(data):
 
 users = load_data()
 
-# --- WEB SERVER (Ye 'Watch Ads' page dikhayega) ---
+# --- WEB SERVER (Monetag Wala HTML Dikhayega) ---
 @app.route('/')
 def home():
-    return AD_PAGE_HTML
+    # Ye templates folder ke andar 'index.html' ko dhundega
+    return render_template('index.html')
 
 def run_web():
     port = int(os.environ.get('PORT', 10000))
@@ -115,12 +71,14 @@ def ensure_user(user_id, referrer_id=None):
 
 def get_main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    # WebApp URL check
+    
+    # Monetag Ad Button
     if WEB_APP_URL.startswith("http"):
         btn1 = types.KeyboardButton(text="Watch Ads 💰", web_app=types.WebAppInfo(WEB_APP_URL))
     else:
-        btn1 = types.KeyboardButton(text="Watch Ads 💰 (Setup Error)")
+        btn1 = types.KeyboardButton(text="Watch Ads 💰 (Setup URL)")
     
+    # Layout Adjustment
     markup.row(btn1)
     markup.row(types.KeyboardButton("Balance 💳"), types.KeyboardButton("Bonus 🎁"))
     markup.row(types.KeyboardButton("Refer and Earn 👥"), types.KeyboardButton("Extra ➡️"))
@@ -142,6 +100,7 @@ def send_welcome(message):
     )
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=get_main_menu())
 
+# --- AD REWARD LOGIC (Jab 'index.html' se success aayega) ---
 @bot.message_handler(content_types=['web_app_data'])
 def web_app_data_handler(message):
     if message.web_app_data.data == "AD_WATCHED_SUCCESS":
@@ -152,7 +111,7 @@ def web_app_data_handler(message):
         reward = 4.2
         users[uid]['balance'] += reward
         
-        # Commission
+        # Commission Logic
         ref_id = users[uid].get('referrer')
         if ref_id and str(ref_id) in users:
             users[str(ref_id)]['balance'] += (reward * 0.05)
@@ -179,7 +138,6 @@ def show_extra(message):
         f"📢 **Official Links:**"
     )
     
-    # 👇 SIRF SUPPORT BUTTON RAHEGA (Channel button hata diya)
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("💬 Support", url="https://t.me/cashysnapsupportbot"))
     
@@ -238,5 +196,8 @@ def refer_earn(message):
 # --- RUNNING ---
 print("Bot Started...")
 keep_alive()
-bot.remove_webhook() # Purana conflict hatane ke liye
+
+# 👇 Ye line Conflict Error 409 ko rokegi
+bot.remove_webhook() 
+
 bot.infinity_polling()
