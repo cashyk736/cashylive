@@ -6,11 +6,14 @@ import json
 import os
 import time
 
-# 👇 1. TOKEN SETUP
+# 👇 1. TOKEN SETUP (Render Environment se lega)
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-# 👇 2. APNA RENDER URL YAHAN DALEIN
-WEB_APP_URL = "https://cashylive.onrender.com"  # <--- CHANGE THIS
+# 👇 2. ADMIN ID (Set kar di gayi hai)
+ADMIN_ID = 1837590729
+
+# 👇 3. WEB APP URL (Set kar diya gaya hai)
+WEB_APP_URL = "https://cashylive.onrender.com"
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
@@ -53,7 +56,6 @@ def keep_alive():
 def ensure_user(user_id, referrer_id=None):
     uid = str(user_id)
     if uid not in users:
-        # New User Create
         users[uid] = {
             'balance': 0.0,
             'refers': 0,
@@ -69,7 +71,7 @@ def ensure_user(user_id, referrer_id=None):
             users[str(referrer_id)]['balance'] += 40.0
             save_data(users)
             
-            # 👇 FIXED NOTIFICATION LOGIC (HTML MODE) 👇
+            # Notification to Referrer
             try:
                 msg = (
                     f"🎉 <b>Someone joined via your referral!</b>\n\n"
@@ -78,8 +80,7 @@ def ensure_user(user_id, referrer_id=None):
                     f"💳 <b>Check balance for details!</b>"
                 )
                 bot.send_message(referrer_id, msg, parse_mode="HTML")
-            except Exception as e:
-                print(f"Notification Error: {e}")
+            except: pass
 
         save_data(users)
     return users[uid]
@@ -96,24 +97,39 @@ def get_main_menu():
     markup.row(types.KeyboardButton("Refer and Earn 👥"), types.KeyboardButton("Extra ➡️"))
     return markup
 
-# --- RESET COMMAND (TESTING) ---
-@bot.message_handler(commands=['reset'])
-def reset_user(message):
-    uid = str(message.from_user.id)
-    if uid in users:
-        del users[uid]
-        save_data(users)
-        bot.reply_to(message, "🗑 **Data Deleted!**\nAb aap wapis Referral Link se join karke test kar sakte hain.")
-    else:
-        bot.reply_to(message, "❌ Aapka data pehle se deleted hai.")
+# --- ADMIN COMMANDS ---
+@bot.message_handler(commands=['stats'])
+def admin_stats(message):
+    if message.from_user.id != ADMIN_ID: return
+    
+    total_users = len(users)
+    total_balance = sum(user['balance'] for user in users.values())
+    total_withdrawn = sum(user['total_withdrawn'] for user in users.values())
+    
+    text = (
+        f"📊 **LIVE BOT STATISTICS**\n\n"
+        f"👥 **Total Real Users:** {total_users}\n"
+        f"💰 **Total User Balance:** ₹{round(total_balance, 2)}\n"
+        f"💸 **Total Paid Out:** ₹{round(total_withdrawn, 2)}\n"
+    )
+    bot.reply_to(message, text, parse_mode="Markdown")
 
-# --- COMMANDS ---
+@bot.message_handler(commands=['data'])
+def admin_data(message):
+    if message.from_user.id != ADMIN_ID: return
+    
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "rb") as file:
+            bot.send_document(message.chat.id, file, caption="📂 Database Backup")
+    else:
+        bot.reply_to(message, "❌ Database file empty.")
+
+# --- USER COMMANDS ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     uid = message.from_user.id
     args = message.text.split()
     referrer = args[1] if len(args) > 1 and args[1].isdigit() and args[1] != str(uid) else None
-    
     ensure_user(uid, referrer)
 
     text = (
@@ -124,7 +140,6 @@ def send_welcome(message):
     )
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=get_main_menu())
 
-# --- AD REWARD ---
 @bot.message_handler(content_types=['web_app_data'])
 def web_app_data_handler(message):
     if message.web_app_data.data == "AD_WATCHED_SUCCESS":
@@ -148,42 +163,27 @@ def web_app_data_handler(message):
         )
         bot.reply_to(message, text, parse_mode="Markdown")
 
-# --- REFER AND EARN ---
 @bot.message_handler(func=lambda message: message.text == "Refer and Earn 👥")
 def refer_earn(message):
     uid = str(message.from_user.id)
     user_data = ensure_user(uid)
     ref_count = user_data['refers']
-    
     bot_name = bot.get_me().username
     link = f"https://t.me/{bot_name}?start={uid}"
     
-    text = (
-        f"👥 **Your Referral Link:**\n\n"
-        f"`{link}`\n\n"
-        f"👫 **Referrals:** {ref_count}\n\n"
-        f"💰 **Earnings:**\n"
-        f"• 40 Rs per referral\n"
-        f"• 5% commission on their ad earnings\n\n"
-        f"📱 Click to share!"
-    )
-    
+    text = (f"👥 **Your Referral Link:**\n\n`{link}`\n\n👫 **Referrals:** {ref_count}\n\n💰 **Earnings:**\n• 40 Rs per referral\n• 5% commission\n\n📱 Click to share!")
     markup = types.InlineKeyboardMarkup()
     share_url = f"https://t.me/share/url?url={link}&text=Join%20this%20bot%20to%20earn%20money%20daily!%20%F0%9F%92%B0"
     markup.add(types.InlineKeyboardButton("📨 Share Link", url=share_url))
-    
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=markup)
 
-# --- WITHDRAWAL SYSTEM ---
 @bot.message_handler(func=lambda message: message.text == "Balance 💳")
 def show_balance(message):
     uid = str(message.from_user.id)
     ensure_user(uid)
     bal = round(users[uid]['balance'], 1)
-    
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("💰 Withdraw", callback_data="withdraw_menu"))
-    
     bot.reply_to(message, f"💳 **Your balance: {bal} Rs**\n\n👇 Ready to withdraw?", parse_mode="Markdown", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data == "withdraw_menu")
@@ -197,8 +197,7 @@ def withdraw_menu(call):
         types.InlineKeyboardButton("₿ USDT TRC20", callback_data="pay_USDT"),
         types.InlineKeyboardButton("⬅️ Back", callback_data="close_menu")
     )
-    bot.edit_message_text("💳 **Choose Payment Method:**\nSelect your preferred withdrawal method below:", 
-                          call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    bot.edit_message_text("💳 **Choose Payment Method:**\nSelect your preferred withdrawal method below:", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("pay_"))
 def ask_payment_details(call):
@@ -209,53 +208,40 @@ def ask_payment_details(call):
     refers = user_data['refers']
 
     if bal < MIN_WITHDRAW_AMOUNT or refers < MIN_REQUIRED_REFERS:
-        error_text = (
-            f"❌ **Cannot Withdraw!**\n\n"
-            f"💳 **Method Selected:** {method}\n\n"
-            f"**Why you can't withdraw:**\n"
-            f"Min {MIN_WITHDRAW_AMOUNT} Rs. Current: {bal}\n\n"
-            f"💡 **Requirements:**\n"
-            f"• Minimum balance: ₹{MIN_WITHDRAW_AMOUNT}\n"
-            f"• Minimum referrals: {MIN_REQUIRED_REFERS} (You have: {refers})\n\n"
-            f"Keep earning to unlock withdrawals! 💰"
-        )
+        error_text = (f"❌ **Cannot Withdraw!**\n\n💳 **Method:** {method}\n\n**Current:** {bal} Rs\n\n💡 **Requirements:**\n• Min balance: ₹{MIN_WITHDRAW_AMOUNT}\n• Min referrals: {MIN_REQUIRED_REFERS} (Yours: {refers})")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("⬅️ Back", callback_data="withdraw_menu"))
         bot.edit_message_text(error_text, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
         return
 
-    msg = bot.edit_message_text(
-        f"✅ **Enter Your {method} details:**\n\n"
-        f"💰 Amount: ₹{bal}\n"
-        f"👇 Reply with your ID/Number:",
-        call.message.chat.id, call.message.message_id, parse_mode="Markdown"
-    )
+    msg = bot.edit_message_text(f"✅ **Enter Your {method} details:**\n\n💰 Amount: ₹{bal}\n👇 Reply with ID/Number:", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_withdrawal, method, bal)
 
 def process_withdrawal(message, method, amount):
     uid = str(message.from_user.id)
+    wallet_details = message.text
     users[uid]['balance'] = 0.0
     users[uid]['total_withdrawn'] += amount
     save_data(users)
-    bot.reply_to(message, "✅ **Request Submitted!**\nProcessing...")
+    
+    bot.reply_to(message, "✅ **Request Submitted!**\nProcessing...", parse_mode="Markdown")
+    
+    # Notify Admin
+    try:
+        admin_msg = (f"🔔 **New Withdrawal!**\n\n👤 User: {message.from_user.first_name} ({uid})\n💰 Amount: ₹{amount}\n💳 Method: {method}\n📝 Detail: `{wallet_details}`")
+        bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
+    except: pass
 
 @bot.callback_query_handler(func=lambda call: call.data == "close_menu")
 def close_menu(call):
     bot.delete_message(call.message.chat.id, call.message.message_id)
 
-# --- OTHER HANDLERS ---
 @bot.message_handler(func=lambda message: message.text == "Extra ➡️")
 def show_extra(message):
     uid = str(message.from_user.id)
     total_users = len(users) + 4419
     total_paid = 191269.0
-    
-    text = (
-        f"📊 **Bot Stats:**\n"
-        f"👥 **Total Users:** {total_users}\n"
-        f"💎 **Total Balance:** ₹{total_paid}\n\n"
-        f"📢 **Official Links:**"
-    )
+    text = (f"📊 **Bot Stats:**\n👥 **Total Users:** {total_users}\n💎 **Total Balance:** ₹{total_paid}\n\n📢 **Official Links:**")
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("💬 Support", url="https://t.me/cashysnapsupportbot"))
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=markup)
@@ -272,7 +258,6 @@ def daily_bonus(message):
     else:
         bot.reply_to(message, "❌ **Already claimed today!**\n⏳ Try tomorrow!", parse_mode="Markdown")
 
-# --- RUNNING ---
 print("Bot Started...")
 keep_alive()
 try:
