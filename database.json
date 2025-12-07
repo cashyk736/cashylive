@@ -1,18 +1,1 @@
-{
-    "815973295": {
-        "balance": 45.0,
-        "refers": 1,
-        "referrer": "1837590729",
-        "total_withdrawn": 0.0,
-        "bonus_taken": true,
-        "join_date": 1765043990.103056
-    },
-    "1837590729": {
-        "balance": 0.0,
-        "refers": 0,
-        "referrer": "815973295",
-        "total_withdrawn": 0.0,
-        "bonus_taken": false,
-        "join_date": 1765044115.3445034
-    }
-}
+{}
