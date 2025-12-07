@@ -7,7 +7,6 @@ import os
 import time
 
 # 👇 1. APNA TOKEN YAHAN DALEIN 👇
-API_TOKEN = '# Token ab hum direct nahi likhenge, balki Environment se lenge
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')' 
 
 # 👇 2. APNA REPLIT URL YAHAN DALEIN 👇
