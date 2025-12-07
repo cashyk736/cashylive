@@ -7,7 +7,8 @@ import os
 import time
 
 # 👇 1. APNA TOKEN YAHAN DALEIN 👇
-API_TOKEN = '8582830529:AAGOMl2dmAFpKSpwXEHFssxnPOFxAEpR3so' 
+API_TOKEN = '# Token ab hum direct nahi likhenge, balki Environment se lenge
+API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')' 
 
 # 👇 2. APNA REPLIT URL YAHAN DALEIN 👇
 WEB_APP_URL = "https://220d7af6-a70b-46c1-afbf-ed6624bf0538-00-14n3p80wqmp44.pike.replit.dev:5000/"
