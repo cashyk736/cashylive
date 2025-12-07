@@ -10,7 +10,7 @@ import time
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 # 👇 2. APNA RENDER URL YAHAN DALEIN (Zaroori hai!)
-# Example: "https://cashylive.onrender.com"
+# Example: "https://your-app.onrender.com"
 WEB_APP_URL = "https://cashylive.onrender.com"  # <--- YAHAN CHANGE KAREIN
 
 bot = telebot.TeleBot(API_TOKEN)
@@ -50,10 +50,11 @@ def keep_alive():
     t = Thread(target=run_web)
     t.start()
 
-# --- HELPER FUNCTIONS ---
+# --- HELPER FUNCTIONS (NOTIFICATION LOGIC YAHAN HAI) ---
 def ensure_user(user_id, referrer_id=None):
     uid = str(user_id)
     if uid not in users:
+        # New User Create
         users[uid] = {
             'balance': 0.0,
             'refers': 0,
@@ -62,19 +63,31 @@ def ensure_user(user_id, referrer_id=None):
             'bonus_taken': False,
             'join_date': time.time()
         }
+        
+        # Referrer ko Commission aur Notification Dena
         if referrer_id and str(referrer_id) in users:
             users[str(referrer_id)]['refers'] += 1
             users[str(referrer_id)]['balance'] += 40.0
             save_data(users)
+            
+            # 👇 YE RAHA AAPKA SCREENSHOT WALA MESSAGE 👇
             try:
-                bot.send_message(referrer_id, f"🎉 **New Referral!**\nUser {user_id} joined via your link.\n💰 You earned +40 Rs!")
-            except: pass
+                msg = (
+                    f"🎉 **Someone joined via your referral!**\n\n"
+                    f"👤 User: User_{user_id}\n"
+                    f"💰 You earned: 40 Rs\n"
+                    f"💳 Check balance for details!"
+                )
+                bot.send_message(referrer_id, msg, parse_mode="Markdown")
+            except:
+                pass # Agar user ne bot block kiya ho to error ignore karein
+
         save_data(users)
     return users[uid]
 
 def get_main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    if WEB_APP_URL.startswith("http"):
+    if WEB_APP_URL and WEB_APP_URL.startswith("http"):
         btn1 = types.KeyboardButton(text="Watch Ads 💰", web_app=types.WebAppInfo(WEB_APP_URL))
     else:
         btn1 = types.KeyboardButton(text="Watch Ads 💰 (Link Error)")
@@ -89,7 +102,9 @@ def get_main_menu():
 def send_welcome(message):
     uid = message.from_user.id
     args = message.text.split()
+    # Referral ID check
     referrer = args[1] if len(args) > 1 and args[1].isdigit() and args[1] != str(uid) else None
+    
     ensure_user(uid, referrer)
 
     text = (
@@ -125,7 +140,7 @@ def web_app_data_handler(message):
         )
         bot.reply_to(message, text, parse_mode="Markdown")
 
-# --- REFER AND EARN (Updated Interface) ---
+# --- REFER AND EARN ---
 @bot.message_handler(func=lambda message: message.text == "Refer and Earn 👥")
 def refer_earn(message):
     uid = str(message.from_user.id)
@@ -135,7 +150,6 @@ def refer_earn(message):
     bot_name = bot.get_me().username
     link = f"https://t.me/{bot_name}?start={uid}"
     
-    # Interface same as screenshot
     text = (
         f"👥 **Your Referral Link:**\n\n"
         f"`{link}`\n\n"
