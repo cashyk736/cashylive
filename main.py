@@ -1,20 +1,24 @@
 import telebot
 from telebot import types
-from flask import Flask, render_template, request
+from flask import Flask, render_template
 from threading import Thread
 import json
 import os
 import time
 
-# 👇 1. TOKEN SETUP (Render Environment Variable se lega)
+# 👇 1. TOKEN SETUP
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-# 👇 2. APNA RENDER URL YAHAN DALEIN (Iske bina Ads nahi chalenge)
-# Example: "https://cashylive.onrender.com"
-WEB_APP_URL = "https://cashylive.onrender.com"  # <--- Change this to your actual link
+# 👇 2. APNA RENDER URL (Zaroori hai)
+# Example: https://cashylive.onrender.com
+WEB_APP_URL = "https://cashylive.onrender.com"  # <--- Yahan apna sahi link dalein
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
+
+# --- SETTINGS (UPDATED) ---
+MIN_WITHDRAW_AMOUNT = 300  # Ab 300 Rs hai
+MIN_REQUIRED_REFERS = 6    # Ab 6 Refers hai
 
 # --- DATABASE SYSTEM ---
 DB_FILE = "database.json"
@@ -33,10 +37,9 @@ def save_data(data):
 
 users = load_data()
 
-# --- WEB SERVER (Monetag Wala HTML Dikhayega) ---
+# --- WEB SERVER ---
 @app.route('/')
 def home():
-    # Ye templates folder ke andar 'index.html' ko dhundega
     return render_template('index.html')
 
 def run_web():
@@ -72,13 +75,11 @@ def ensure_user(user_id, referrer_id=None):
 def get_main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     
-    # Monetag Ad Button
     if WEB_APP_URL.startswith("http"):
         btn1 = types.KeyboardButton(text="Watch Ads 💰", web_app=types.WebAppInfo(WEB_APP_URL))
     else:
-        btn1 = types.KeyboardButton(text="Watch Ads 💰 (Setup URL)")
+        btn1 = types.KeyboardButton(text="Watch Ads 💰 (Link Error)")
     
-    # Layout Adjustment
     markup.row(btn1)
     markup.row(types.KeyboardButton("Balance 💳"), types.KeyboardButton("Bonus 🎁"))
     markup.row(types.KeyboardButton("Refer and Earn 👥"), types.KeyboardButton("Extra ➡️"))
@@ -100,18 +101,16 @@ def send_welcome(message):
     )
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=get_main_menu())
 
-# --- AD REWARD LOGIC (Jab 'index.html' se success aayega) ---
+# --- AD REWARD ---
 @bot.message_handler(content_types=['web_app_data'])
 def web_app_data_handler(message):
     if message.web_app_data.data == "AD_WATCHED_SUCCESS":
         uid = str(message.from_user.id)
         ensure_user(uid)
         
-        # Reward Logic
         reward = 4.2
         users[uid]['balance'] += reward
         
-        # Commission Logic
         ref_id = users[uid].get('referrer')
         if ref_id and str(ref_id) in users:
             users[str(ref_id)]['balance'] += (reward * 0.05)
@@ -125,35 +124,7 @@ def web_app_data_handler(message):
         )
         bot.reply_to(message, text, parse_mode="Markdown")
 
-@bot.message_handler(func=lambda message: message.text == "Extra ➡️")
-def show_extra(message):
-    uid = str(message.from_user.id)
-    total_users = len(users) + 533
-    total_paid = 29285.7
-    
-    text = (
-        f"📊 **Bot Stats:**\n"
-        f"👥 **Total Users:** {total_users}\n"
-        f"💎 **Total Balance:** ₹{total_paid}\n\n"
-        f"📢 **Official Links:**"
-    )
-    
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("💬 Support", url="https://t.me/cashysnapsupportbot"))
-    
-    bot.reply_to(message, text, parse_mode="Markdown", reply_markup=markup)
-
-@bot.message_handler(func=lambda message: message.text == "Bonus 🎁")
-def daily_bonus(message):
-    uid = str(message.from_user.id)
-    ensure_user(uid)
-    if not users[uid]['bonus_taken']:
-        users[uid]['balance'] += 5.0
-        users[uid]['bonus_taken'] = True
-        save_data(users)
-        bot.reply_to(message, "🎉 **Daily Bonus Claimed!**\n+5 Rs added!\n👇 Check balance!", parse_mode="Markdown")
-    else:
-        bot.reply_to(message, "❌ **Already claimed today!**\n⏳ Try tomorrow!", parse_mode="Markdown")
+# --- WITHDRAWAL SYSTEM ---
 
 @bot.message_handler(func=lambda message: message.text == "Balance 💳")
 def show_balance(message):
@@ -172,14 +143,88 @@ def withdraw_menu(call):
     markup.add(
         types.InlineKeyboardButton("💳 Paytm", callback_data="pay_Paytm"),
         types.InlineKeyboardButton("💸 UPI", callback_data="pay_UPI"),
-        types.InlineKeyboardButton("💲 USDT TRC20", callback_data="pay_USDT"),
+        types.InlineKeyboardButton("🏦 Bank Transfer", callback_data="pay_Bank"),
+        types.InlineKeyboardButton("💲 Paypal", callback_data="pay_Paypal"),
+        types.InlineKeyboardButton("₿ USDT TRC20", callback_data="pay_USDT"),
         types.InlineKeyboardButton("⬅️ Back", callback_data="close_menu")
     )
-    bot.edit_message_text("💳 **Choose Payment Method:**", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    bot.edit_message_text("💳 **Choose Payment Method:**\nSelect your preferred withdrawal method below:", 
+                          call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("pay_"))
+def ask_payment_details(call):
+    method = call.data.split("_")[1]
+    uid = str(call.from_user.id)
+    user_data = users[uid]
+    bal = round(user_data['balance'], 1)
+    refers = user_data['refers']
+
+    # 👇 UPDATED LOGIC (300 Rs aur 6 Refers check karega)
+    if bal < MIN_WITHDRAW_AMOUNT or refers < MIN_REQUIRED_REFERS:
+        error_text = (
+            f"❌ **Cannot Withdraw!**\n\n"
+            f"💳 **Method Selected:** {method}\n\n"
+            f"**Why you can't withdraw:**\n"
+            f"Min {MIN_WITHDRAW_AMOUNT} Rs. Current: {bal}\n\n"
+            f"💡 **Requirements:**\n"
+            f"• Minimum balance: ₹{MIN_WITHDRAW_AMOUNT}\n"
+            f"• Minimum referrals: {MIN_REQUIRED_REFERS} (You have: {refers})\n\n"
+            f"Keep earning to unlock withdrawals! 💰"
+        )
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("⬅️ Back", callback_data="withdraw_menu"))
+        
+        bot.edit_message_text(error_text, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+        return
+
+    msg = bot.edit_message_text(
+        f"✅ **Enter Your {method} details:**\n\n"
+        f"💰 Amount: ₹{bal}\n"
+        f"👇 Reply with your ID/Number:",
+        call.message.chat.id, call.message.message_id, parse_mode="Markdown"
+    )
+    bot.register_next_step_handler(msg, process_withdrawal, method, bal)
+
+def process_withdrawal(message, method, amount):
+    uid = str(message.from_user.id)
+    users[uid]['balance'] = 0.0
+    users[uid]['total_withdrawn'] += amount
+    save_data(users)
+    bot.reply_to(message, "✅ **Request Submitted!**\nProcessing...")
 
 @bot.callback_query_handler(func=lambda call: call.data == "close_menu")
 def close_menu(call):
     bot.delete_message(call.message.chat.id, call.message.message_id)
+
+# --- OTHER HANDLERS ---
+@bot.message_handler(func=lambda message: message.text == "Extra ➡️")
+def show_extra(message):
+    uid = str(message.from_user.id)
+    total_users = len(users) + 533
+    total_paid = 29285.7
+    
+    text = (
+        f"📊 **Bot Stats:**\n"
+        f"👥 **Total Users:** {total_users}\n"
+        f"💎 **Total Balance:** ₹{total_paid}\n\n"
+        f"📢 **Official Links:**"
+    )
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("💬 Support", url="https://t.me/cashysnapsupportbot"))
+    bot.reply_to(message, text, parse_mode="Markdown", reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == "Bonus 🎁")
+def daily_bonus(message):
+    uid = str(message.from_user.id)
+    ensure_user(uid)
+    if not users[uid]['bonus_taken']:
+        users[uid]['balance'] += 5.0
+        users[uid]['bonus_taken'] = True
+        save_data(users)
+        bot.reply_to(message, "🎉 **Daily Bonus Claimed!**\n+5 Rs added!\n👇 Check balance!", parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "❌ **Already claimed today!**\n⏳ Try tomorrow!", parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: message.text == "Refer and Earn 👥")
 def refer_earn(message):
@@ -196,8 +241,5 @@ def refer_earn(message):
 # --- RUNNING ---
 print("Bot Started...")
 keep_alive()
-
-# 👇 Ye line Conflict Error 409 ko rokegi
-bot.remove_webhook() 
-
+bot.remove_webhook()
 bot.infinity_polling()
