@@ -9,16 +9,16 @@ import time
 # 👇 1. TOKEN SETUP
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-# 👇 2. APNA RENDER URL (Zaroori hai)
-# Example: https://cashylive.onrender.com
-WEB_APP_URL = "https://cashylive.onrender.com"  # <--- Yahan apna sahi link dalein
+# 👇 2. APNA RENDER URL YAHAN DALEIN (Zaroori hai!)
+# Example: "https://cashylive.onrender.com"
+WEB_APP_URL = "https://cashylive.onrender.com"  # <--- YAHAN CHANGE KAREIN
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
 
-# --- SETTINGS (UPDATED) ---
-MIN_WITHDRAW_AMOUNT = 300  # Ab 300 Rs hai
-MIN_REQUIRED_REFERS = 6    # Ab 6 Refers hai
+# --- SETTINGS ---
+MIN_WITHDRAW_AMOUNT = 300
+MIN_REQUIRED_REFERS = 6
 
 # --- DATABASE SYSTEM ---
 DB_FILE = "database.json"
@@ -74,7 +74,6 @@ def ensure_user(user_id, referrer_id=None):
 
 def get_main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    
     if WEB_APP_URL.startswith("http"):
         btn1 = types.KeyboardButton(text="Watch Ads 💰", web_app=types.WebAppInfo(WEB_APP_URL))
     else:
@@ -101,7 +100,7 @@ def send_welcome(message):
     )
     bot.reply_to(message, text, parse_mode="Markdown", reply_markup=get_main_menu())
 
-# --- AD REWARD ---
+# --- AD REWARD & COMMISSION ---
 @bot.message_handler(content_types=['web_app_data'])
 def web_app_data_handler(message):
     if message.web_app_data.data == "AD_WATCHED_SUCCESS":
@@ -111,9 +110,11 @@ def web_app_data_handler(message):
         reward = 4.2
         users[uid]['balance'] += reward
         
+        # 5% Commission Logic
         ref_id = users[uid].get('referrer')
         if ref_id and str(ref_id) in users:
-            users[str(ref_id)]['balance'] += (reward * 0.05)
+            commission = reward * 0.05
+            users[str(ref_id)]['balance'] += commission
         
         save_data(users)
         
@@ -124,8 +125,34 @@ def web_app_data_handler(message):
         )
         bot.reply_to(message, text, parse_mode="Markdown")
 
-# --- WITHDRAWAL SYSTEM ---
+# --- REFER AND EARN (Updated Interface) ---
+@bot.message_handler(func=lambda message: message.text == "Refer and Earn 👥")
+def refer_earn(message):
+    uid = str(message.from_user.id)
+    user_data = ensure_user(uid)
+    ref_count = user_data['refers']
+    
+    bot_name = bot.get_me().username
+    link = f"https://t.me/{bot_name}?start={uid}"
+    
+    # Interface same as screenshot
+    text = (
+        f"👥 **Your Referral Link:**\n\n"
+        f"`{link}`\n\n"
+        f"👫 **Referrals:** {ref_count}\n\n"
+        f"💰 **Earnings:**\n"
+        f"• 40 Rs per referral\n"
+        f"• 5% commission on their ad earnings\n\n"
+        f"📱 Click to share!"
+    )
+    
+    markup = types.InlineKeyboardMarkup()
+    share_url = f"https://t.me/share/url?url={link}&text=Join%20this%20bot%20to%20earn%20money%20daily!%20%F0%9F%92%B0"
+    markup.add(types.InlineKeyboardButton("📨 Share Link", url=share_url))
+    
+    bot.reply_to(message, text, parse_mode="Markdown", reply_markup=markup)
 
+# --- WITHDRAWAL SYSTEM ---
 @bot.message_handler(func=lambda message: message.text == "Balance 💳")
 def show_balance(message):
     uid = str(message.from_user.id)
@@ -159,7 +186,6 @@ def ask_payment_details(call):
     bal = round(user_data['balance'], 1)
     refers = user_data['refers']
 
-    # 👇 UPDATED LOGIC (300 Rs aur 6 Refers check karega)
     if bal < MIN_WITHDRAW_AMOUNT or refers < MIN_REQUIRED_REFERS:
         error_text = (
             f"❌ **Cannot Withdraw!**\n\n"
@@ -171,10 +197,8 @@ def ask_payment_details(call):
             f"• Minimum referrals: {MIN_REQUIRED_REFERS} (You have: {refers})\n\n"
             f"Keep earning to unlock withdrawals! 💰"
         )
-        
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("⬅️ Back", callback_data="withdraw_menu"))
-        
         bot.edit_message_text(error_text, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
         return
 
@@ -201,8 +225,8 @@ def close_menu(call):
 @bot.message_handler(func=lambda message: message.text == "Extra ➡️")
 def show_extra(message):
     uid = str(message.from_user.id)
-    total_users = len(users) + 533
-    total_paid = 29285.7
+    total_users = len(users) + 4419
+    total_paid = 191269.0
     
     text = (
         f"📊 **Bot Stats:**\n"
@@ -226,20 +250,12 @@ def daily_bonus(message):
     else:
         bot.reply_to(message, "❌ **Already claimed today!**\n⏳ Try tomorrow!", parse_mode="Markdown")
 
-@bot.message_handler(func=lambda message: message.text == "Refer and Earn 👥")
-def refer_earn(message):
-    uid = str(message.from_user.id)
-    bot_name = bot.get_me().username
-    link = f"https://t.me/{bot_name}?start={uid}"
-    
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("📩 Share Link", url=f"https://t.me/share/url?url={link}&text=Join%20Now!"))
-    
-    text = (f"👥 **Your Referral Link:**\n`{link}`\n\n💰 **Earnings:**\n• 40 Rs per referral")
-    bot.reply_to(message, text, parse_mode="Markdown", reply_markup=markup)
-
 # --- RUNNING ---
 print("Bot Started...")
 keep_alive()
-bot.remove_webhook()
-bot.infinity_polling()
+try:
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+except Exception as e:
+    print(f"⚠️ Error ignored: {e}")
