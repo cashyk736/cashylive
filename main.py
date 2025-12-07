@@ -10,7 +10,7 @@ import time
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 # 👇 2. APNA RENDER URL YAHAN DALEIN
-WEB_APP_URL = "https://cashylive.onrender.com"  # <--- YAHAN CHANGE KAREIN
+WEB_APP_URL = "https://cashylive.onrender.com"  # <--- CHANGE THIS
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
@@ -69,16 +69,17 @@ def ensure_user(user_id, referrer_id=None):
             users[str(referrer_id)]['balance'] += 40.0
             save_data(users)
             
-            # Notification to Referrer
+            # 👇 FIXED NOTIFICATION LOGIC (HTML MODE) 👇
             try:
                 msg = (
-                    f"🎉 **Someone joined via your referral!**\n\n"
-                    f"👤 User: User_{user_id}\n"
-                    f"💰 You earned: 40 Rs\n"
-                    f"💳 Check balance for details!"
+                    f"🎉 <b>Someone joined via your referral!</b>\n\n"
+                    f"👤 <b>User:</b> User_{user_id}\n"
+                    f"💰 <b>You earned:</b> 40 Rs\n"
+                    f"💳 <b>Check balance for details!</b>"
                 )
-                bot.send_message(referrer_id, msg, parse_mode="Markdown")
-            except: pass
+                bot.send_message(referrer_id, msg, parse_mode="HTML")
+            except Exception as e:
+                print(f"Notification Error: {e}")
 
         save_data(users)
     return users[uid]
@@ -95,7 +96,7 @@ def get_main_menu():
     markup.row(types.KeyboardButton("Refer and Earn 👥"), types.KeyboardButton("Extra ➡️"))
     return markup
 
-# --- NEW SECRET COMMAND (TESTING KE LIYE) ---
+# --- RESET COMMAND (TESTING) ---
 @bot.message_handler(commands=['reset'])
 def reset_user(message):
     uid = str(message.from_user.id)
@@ -133,7 +134,6 @@ def web_app_data_handler(message):
         reward = 4.2
         users[uid]['balance'] += reward
         
-        # Commission
         ref_id = users[uid].get('referrer')
         if ref_id and str(ref_id) in users:
             commission = reward * 0.05
