@@ -6,21 +6,21 @@ import json
 import os
 import time
 
-# 👇 1. TOKEN SETUP (Render Environment se lega)
+# 👇 1. TOKEN SETUP
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-# 👇 2. ADMIN ID (Set kar di gayi hai)
+# 👇 2. ADMIN ID
 ADMIN_ID = 1837590729
 
-# 👇 3. WEB APP URL (Set kar diya gaya hai)
+# 👇 3. WEB APP URL
 WEB_APP_URL = "https://cashylive.onrender.com"
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
 
-# --- SETTINGS ---
-MIN_WITHDRAW_AMOUNT = 300
-MIN_REQUIRED_REFERS = 6
+# --- SETTINGS (UPDATED) ---
+MIN_WITHDRAW_AMOUNT = 380  # Ab Minimum 380 Rs chahiye
+MIN_REQUIRED_REFERS = 12   # Ab Minimum 12 Refers chahiye
 
 # --- DATABASE SYSTEM ---
 DB_FILE = "database.json"
@@ -65,13 +65,11 @@ def ensure_user(user_id, referrer_id=None):
             'join_date': time.time()
         }
         
-        # Referrer Logic
         if referrer_id and str(referrer_id) in users:
             users[str(referrer_id)]['refers'] += 1
             users[str(referrer_id)]['balance'] += 40.0
             save_data(users)
             
-            # Notification to Referrer
             try:
                 msg = (
                     f"🎉 <b>Someone joined via your referral!</b>\n\n"
