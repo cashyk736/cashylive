@@ -18,9 +18,9 @@ WEB_APP_URL = "https://cashylive.onrender.com"
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
 
-# --- SETTINGS (UPDATED) ---
-MIN_WITHDRAW_AMOUNT = 380  # Ab Minimum 380 Rs chahiye
-MIN_REQUIRED_REFERS = 12   # Ab Minimum 12 Refers chahiye
+# --- SETTINGS ---
+MIN_WITHDRAW_AMOUNT = 380
+MIN_REQUIRED_REFERS = 12
 
 # --- DATABASE SYSTEM ---
 DB_FILE = "database.json"
@@ -94,6 +94,17 @@ def get_main_menu():
     markup.row(types.KeyboardButton("Balance 💳"), types.KeyboardButton("Bonus 🎁"))
     markup.row(types.KeyboardButton("Refer and Earn 👥"), types.KeyboardButton("Extra ➡️"))
     return markup
+
+# --- 🛠 RESET COMMAND (TESTING KE LIYE) ---
+@bot.message_handler(commands=['reset'])
+def reset_user(message):
+    uid = str(message.from_user.id)
+    if uid in users:
+        del users[uid]
+        save_data(users)
+        bot.reply_to(message, "🗑 **Data Deleted!**\nAb aap wapis Referral Link se join karke test kar sakte hain.")
+    else:
+        bot.reply_to(message, "❌ Aapka data pehle se deleted hai.")
 
 # --- ADMIN COMMANDS ---
 @bot.message_handler(commands=['stats'])
